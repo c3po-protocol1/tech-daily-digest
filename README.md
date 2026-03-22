@@ -4,20 +4,17 @@ Daily curated summaries from top tech sources, compiled by Yoda.
 
 ## Sources
 - **Hacker News** (news.ycombinator.com) — Top stories
-- **GeekNews** (news.hada.io) — Korean tech community
+- **GeekNews** (news.hada.io) — Korean tech community (top 15, tech-only)
 - **GitHub Trending** — Trending repositories
 
 ## Structure
 ```
-YYYY/
-  MM/
-    source/
-      topic/
-        YYYY-MM-DD-title.md
+YYYY/MM/DD/digest.md          ← 자동 일일 요약 (7일 후 자동 삭제)
+YYYY/MM/articles/topic/       ← 별도 요청 자료 (영구 보관)
 ```
 
-Files are organized by year, month, source, and topic category.
-No folder exceeds 10 documents — subcategories are created as needed.
+- Daily digests: auto-deleted after 7 days
+- Articles (manually requested): permanent
 
 ## Schedule
 Updated daily at 08:00 KST (Asia/Seoul).
