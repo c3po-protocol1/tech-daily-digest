@@ -1,16 +1,24 @@
-# Leonxlnx/claude-code-system-prompts
+# Leonxlnx/claude-code-system-prompts — Claude Code 시스템 프롬프트 패턴 연구
 
 - **출처:** [GitHub](https://github.com/Leonxlnx/claude-code-system-prompts)
-- **스타:** ★ 1031
-- **언어:** ?
-- **태그:** `#ClaudeCode #SystemPrompt #Research`
+- **스타:** ★ 1,031
+- **태그:** `#ClaudeCode` `#SystemPrompt` `#Research` `#AgentArchitecture`
 
 ---
 
 ## 핵심 요약
 
-Claude Code의 시스템 프롬프트 패턴 연구. 에이전트 조정, 도구 정의, 안전장치 등 프롬프트 아키텍처 분석. 하루 만에 1031개의 스타를 획득하며, Claude Code 소스 유출 사건의 여파로 AI 코딩 도구 오픈소스 생태계가 폭발적으로 성장 중.
+Claude Code를 포함한 에이전틱 AI 코딩 어시스턴트의 작동 방식을 연구한 프로젝트. 재구성된 프롬프트 패턴, 에이전트 조정 프로토콜, 도구 라우팅 로직을 문서화.
+
+### 주요 내용
+
+- **시스템 프롬프트 패턴 재구성**: Claude Code가 사용하는 시스템 프롬프트의 구조를 분석하고 재구성
+- **에이전트 조정 프로토콜**: 메인 에이전트와 서브에이전트 간의 통신/조정 패턴
+- **도구 정의와 라우팅**: 어떤 도구가 언제, 어떤 조건에서 활성화되는지의 로직
+- **안전장치 메커니즘**: 위험한 작업에 대한 승인 흐름, 파일 시스템 접근 제한 등
+
+1,031★로 높은 관심. Claude Code의 소스 유출과 맞물려, 프로덕션 AI 에이전트의 프롬프트 아키텍처를 이해하려는 수요가 폭발.
 
 ## Soo에게 의미 있는 이유
 
-Claude Code 유출 사건이 촉발한 오픈소스 AI 코딩 도구 생태계의 급변. AInD 컨설팅에서 중요한 시장 동향.
+Harness 엔지니어링에서 시스템 프롬프트 설계는 가장 핵심적인 부분. 이 프로젝트는 실제 프로덕션 에이전트의 프롬프트 패턴을 학습할 수 있는 참고 자료.
