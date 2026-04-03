@@ -1,188 +1,190 @@
-# Claude Code Internals — How It Actually Works
+# Claude Code 내부 동작 방식 — 완전 해부
 
-> **Source:** [How Claude Code works (Mintlify)](https://www.mintlify.com/VineeTagarwaL-code/claude-code/concepts/how-it-works)
-> **Date:** 2026-04-03
-> **Tags:** `#ClaudeCode` `#Architecture` `#AgenticLoop` `#Context` `#ToolExecution`
-
----
-
-## Overview
-
-Claude Code is a terminal-based coding agent built on a **continuous agentic loop**: read request → reason → call tools → observe results → repeat. It runs entirely in your local terminal process — no remote execution server. Files, shell, and credentials never leave your machine unless an explicit network tool is invoked (e.g., `WebFetch`, `WebSearch`, or an MCP server).
-
-This article breaks down the seven core mechanisms that make it work, based on the leaked source code analysis.
+> **원문:** [How Claude Code works (Mintlify)](https://www.mintlify.com/VineeTagarwaL-code/claude-code/concepts/how-it-works)
+> **작성일:** 2026-04-03
+> **태그:** `#ClaudeCode` `#아키텍처` `#에이전트루프` `#컨텍스트` `#도구실행`
 
 ---
 
-## 1. The Agentic Loop — 6-Step Core Cycle
+## 개요
 
-Every interaction follows the same fundamental cycle:
+Claude Code는 터미널에서 실행되는 **연속 에이전트 루프(Agentic Loop)** 기반 코딩 에이전트다. 사용자 요청 → 추론 → 도구 호출 → 결과 관찰 → 반복의 사이클을 돌며, 작업이 완료되거나 사용자 입력이 필요할 때까지 자동으로 순환한다.
 
-### Step 1: User Sends a Message
+핵심적으로 **원격 실행 서버가 없다.** 모든 것이 로컬 터미널 프로세스에서 동작하며, 파일/셸/인증정보가 머신을 떠나지 않는다 (WebFetch, WebSearch, MCP 서버 등 명시적 네트워크 도구 제외).
 
-The user types in the terminal (Interactive mode) or passes a message via `--print`/stdin (Non-interactive/headless mode). The message is appended to the conversation history.
-
-### Step 2: Context Assembly
-
-Before calling the model, Claude Code assembles a system prompt containing:
-
-- Current date
-- Git status (branch, recent commits, working tree state)
-- CLAUDE.md memory files
-- List of available tools
-
-This context is built by `context.ts` and **memoized for the entire conversation** — it's not recalculated every turn.
-
-### Step 3: Claude Reasons + Selects Tools
-
-The assembled conversation is sent to the Anthropic API. The model reasons about the task and emits one or more `tool_use` blocks, each containing a **tool name + structured JSON input**.
-
-### Step 4: Permission Check
-
-Before executing each tool call, Claude Code evaluates the current permission mode and allow/deny rules. Three possible outcomes:
-
-- **allow** — Tool runs immediately
-- **ask** — User confirmation dialog is shown
-- **deny** — Tool call is rejected; model receives an error result
-
-### Step 5: Tool Executes + Returns Result
-
-Approved tools run. Results (file contents, command output, search hits) are appended to the conversation as `tool_result` blocks.
-
-### Step 6: Loop Continues
-
-The model receives tool results and either calls more tools or produces a final text response. **The loop repeats until no tool calls remain in a model turn.**
+유출된 소스코드를 기반으로 7가지 핵심 메커니즘을 분석한다.
 
 ---
 
-## 2. Context Loading — What Gets Injected at Session Start
+## 1. The Agentic Loop — 6단계 핵심 사이클
 
-Two context blocks are prepended to every API call:
+모든 상호작용은 동일한 사이클을 따른다:
+
+### Step 1: 사용자 메시지 전송
+
+터미널 입력(Interactive 모드) 또는 `--print`/stdin(Non-interactive/headless 모드)으로 메시지를 전달한다. 메시지가 대화 히스토리에 추가된다.
+
+### Step 2: 컨텍스트 조립
+
+API 호출 전에 Claude Code가 시스템 프롬프트를 구성한다:
+
+- 현재 날짜
+- Git 상태 (브랜치, 최근 커밋, working tree 상태)
+- CLAUDE.md 메모리 파일
+- 사용 가능한 도구 목록
+
+이 컨텍스트는 `context.ts`에서 처리되며, **대화 내내 memoize**된다 (매 턴마다 재계산하지 않음).
+
+### Step 3: Claude 추론 + 도구 선택
+
+조립된 대화가 Anthropic API로 전송된다. 모델이 추론 후 하나 이상의 `tool_use` 블록을 생성한다. 각 블록은 **도구 이름 + 구조화된 JSON 입력**을 포함.
+
+### Step 4: 권한 체크 (Permission Check)
+
+각 도구 호출 실행 전에 현재 permission mode와 allow/deny 규칙을 평가한다. 3가지 결과:
+
+- **allow** — 즉시 실행
+- **ask** — 사용자 확인 다이얼로그 표시
+- **deny** — 차단, 모델에 에러 결과 반환
+
+### Step 5: 도구 실행 + 결과 반환
+
+승인된 도구가 실행되고, 결과(파일 내용, 명령 출력, 검색 결과 등)가 `tool_result` 블록으로 대화에 추가된다.
+
+### Step 6: 루프 반복
+
+모델이 도구 결과를 받고, 추가 도구를 호출하거나 최종 텍스트 응답을 생성한다. **tool call이 더 이상 없을 때까지 반복.**
+
+---
+
+## 2. Context Loading — 세션 시작 시 주입되는 것들
+
+매 대화 시작 시 **2개의 컨텍스트 블록**이 모든 API 호출에 prepend된다:
 
 ### System Context (`getSystemContext()`)
 
-- **Git status** — Current branch, default/main branch, git username, `git status --short` output (truncated at 2,000 chars), last 5 commits from `git log --oneline`
-- **Cache-breaking injection** — An ephemeral string used internally to bust the server-side prompt cache during debugging
-- Skipped when `CLAUDE_CODE_REMOTE=1` is set (remote/cloud mode)
+- **Git 상태** — 현재 브랜치, default/main 브랜치, git username, `git status --short` 출력 (2,000자 초과 시 truncate), 최근 5개 커밋 (`git log --oneline`)
+- **Cache-breaking injection** — 디버깅 시 서버 사이드 프롬프트 캐시를 무효화하는 임시 문자열
+- `CLAUDE_CODE_REMOTE=1` 설정 시 git 상태 수집 스킵
 
 ### User Context (`getUserContext()`)
 
-- **CLAUDE.md memory** — All memory files discovered by the 4-level hierarchy: managed → user → project → local. Can be disabled with `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`
-- **Current date** — Injected as `Today's date is YYYY-MM-DD` so the model always knows the date
+- **CLAUDE.md 메모리** — 4단계 계층 탐색: managed → user → project → local. `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`로 비활성화 가능
+- **현재 날짜** — `Today's date is YYYY-MM-DD` 형태로 주입하여 모델이 항상 날짜를 인식
 
-### Memoization Strategy
+### Memoization 전략
 
-Both context blocks are cached via `lodash/memoize` **for the entire conversation**. Calculated once on the first API call, then reused for subsequent turns. Calling `setSystemPromptInjection()` clears the cache immediately.
-
----
-
-## 3. Tool Execution Model — The Permission System
-
-Claude Code does **not** execute tool calls autonomously by default. Every tool has a `checkPermissions` method returning one of three results:
-
-| Result | Behavior |
-|--------|----------|
-| `allow` | Runs immediately, result appended to conversation |
-| `ask` | Pauses and shows a confirmation dialog |
-| `deny` | Rejected; model receives an error result |
-
-### Permission Modes
-
-- **`bypassPermissions`** — All checks skipped. Fully autonomous execution (for CI/CD, scripting)
-- **`acceptEdits`** — File edit tools (`Edit`, `Write`) are auto-approved, but bash commands still require confirmation
-- **Default mode** — All write operations require user confirmation
-
-**Exception:** Read-only tools (`Read`, `Glob`, `Grep`) are **auto-approved across all modes** — they're considered safe since they only read.
+두 컨텍스트 모두 `lodash/memoize`로 **대화 내내 캐싱**된다. 첫 번째 API 호출 시 한 번 계산되고, 이후 턴에서는 캐시된 값을 재사용. `setSystemPromptInjection()`을 호출하면 즉시 캐시가 무효화된다.
 
 ---
 
-## 4. Interactive vs Non-Interactive Mode
+## 3. Tool Execution Model — 권한 시스템
 
-### Interactive (REPL) Mode
+Claude Code는 기본적으로 도구 호출을 **자율적으로 실행하지 않는다.** 모든 도구에 `checkPermissions` 메서드가 있고, 3가지 결과를 반환한다:
 
-The default experience. Renders a live terminal UI using **React/Ink**:
+| 결과 | 동작 |
+|------|------|
+| `allow` | 즉시 실행, 결과를 대화에 추가 |
+| `ask` | 사용자에게 확인 다이얼로그 표시 후 대기 |
+| `deny` | 거부, 모델에 에러 결과 반환 |
 
-- Streaming token output (tokens displayed as they're generated)
-- Tool-use confirmation dialogs
-- Spinner animations
-- Messages persist within the session
+### Permission Mode별 동작
 
-### Non-Interactive (Print) Mode
+- **`bypassPermissions`** — 모든 권한 체크 스킵. 완전 자동 실행 (CI/CD, 스크립트 용도)
+- **`acceptEdits`** — 파일 편집 도구(`Edit`, `Write`)는 자동 승인, bash 명령은 여전히 확인 필요
+- **기본 모드** — 모든 쓰기 작업에 사용자 확인 필요
 
-Activated with `--print` flag or by piping stdin:
+**예외:** Read-only 도구 (`Read`, `Glob`, `Grep`)는 **모든 모드에서 자동 승인**된다. 읽기만 하므로 안전하다고 판단.
 
-- No UI rendered
-- Output written to stdout
-- Designed for CI/CD pipelines and script automation
-- One-shot tasks
+---
+
+## 4. Interactive vs Non-interactive 모드
+
+### Interactive (REPL) 모드
+
+기본 모드. **React/Ink 기반 터미널 UI**를 렌더링한다:
+
+- 스트리밍 토큰 출력 (토큰이 생성되는 대로 표시)
+- 도구 사용 확인 다이얼로그
+- 스피너 애니메이션
+- 세션 내 메시지 유지
+
+### Non-interactive (Print) 모드
+
+`--print` 플래그 또는 stdin 파이프로 활성화:
+
+- UI 없음
+- stdout으로 출력
+- CI/CD 파이프라인이나 스크립트 자동화에 적합
+- 원샷 작업용
 
 ---
 
 ## 5. Sub-agents (Task Tool)
 
-Claude can spawn **sub-agents** via the `Task` tool (`AgentTool`):
+Claude는 `Task` 도구(`AgentTool`)를 통해 **서브 에이전트를 생성**할 수 있다:
 
-- Each sub-agent runs its own **nested agentic loop with an isolated conversation**
-- Optionally assigned a **restricted tool set** (e.g., read-only tools only)
-- Can run locally (in-process) or on remote compute
-- Results returned to the parent agent upon completion
+- 각 서브 에이전트는 **독립된 대화 컨텍스트**에서 자체 agentic loop 실행
+- 선택적으로 **제한된 도구 세트** 지정 가능 (예: 읽기 전용 도구만)
+- 로컬(인프로세스) 또는 원격 컴퓨트에서 실행
+- 완료 시 결과를 부모 에이전트에 반환
 
-This enables **divide-and-conquer** for complex tasks: the parent agent owns the strategy, sub-agents handle individual files or modules.
+이를 통해 복잡한 작업을 **분할 정복** 방식으로 처리할 수 있다. 부모 에이전트는 전체 전략을, 서브 에이전트는 개별 파일이나 모듈 단위의 작업을 담당.
 
 ---
 
 ## 6. Conversation Storage & Resumption
 
-### Storage
+### 저장 방식
 
-Conversations are stored as **JSON transcript files** in `~/.claude/`. Each conversation has a unique session ID.
+대화는 **JSON 트랜스크립트 파일**로 `~/.claude/` 디렉토리에 저장된다. 각 대화에 고유 세션 ID가 부여된다.
 
-### Resumption
+### 재개 방법
 
-- `--resume <session-id>` — Resume a specific session
-- `--resume` (no args) — Pick from a list of previous sessions
+- `--resume <session-id>` — 특정 세션 직접 재개
+- `--resume` (인자 없이) — 이전 세션 목록에서 선택
 
-### What Happens on Resume
+### 재개 시 동작
 
-1. **Full message history** loaded from disk
-2. **Memory files re-discovered** — May differ from when the conversation first started (files could have been modified/added/deleted)
-3. **Permission mode** resets to the configured default (unless persisted in session)
+1. **전체 메시지 히스토리**를 디스크에서 로드
+2. **메모리 파일 재탐색** — 최초 대화 시점과 달라질 수 있음 (파일이 수정/추가/삭제되었을 수 있으므로)
+3. **Permission mode**는 설정된 기본값으로 리셋 (세션에 저장된 경우 제외)
 
-### Compaction — Managing Long Conversations
+### Compaction — 긴 대화 관리
 
-Long conversations are periodically **compacted** — oldest messages are summarized to keep the context window manageable:
+긴 대화는 주기적으로 **오래된 메시지를 요약(compact)**하여 컨텍스트 윈도우를 관리한다:
 
-- **Original transcript always preserved on disk** — full integrity maintained
-- **Compaction only affects what's sent to the API** — reduces cost and stays within context limits
-- This is one of the most critical mechanisms in agent design: how to handle infinite conversations within a finite context window
-
----
-
-## 7. The Query Engine — Per-Turn Execution
-
-Each "turn" in the agentic loop is driven by a **query** — a call to `query.ts` that sends the current message list to the Anthropic API and streams back the response.
-
-The query engine handles:
-
-1. **Streaming token output** — Real-time display in terminal
-2. **`tool_use` block dispatch** — Routes to appropriate tool handlers
-3. **Per-turn budget enforcement** — Token count and tool call limits
-4. **Tool result collection** — Appends results before the next model call
-5. **Compaction trigger** — Fires automatically when context window fills up
-
-### Result Size Limiting (`maxResultSizeChars`)
-
-Each tool has a `maxResultSizeChars` property. When a result exceeds this limit:
-
-1. Full content is **saved to a temporary file**
-2. Model receives only a **preview + file path**
-3. Prevents context window overflow from large outputs
-
-This ensures that even reading a massive file won't blow up the context.
+- 원본 트랜스크립트는 **디스크에 항상 보존** — 무결성 유지
+- Compaction은 **API에 보내는 것만** 영향 — 비용 절감 + 컨텍스트 한계 관리
+- 에이전트 설계에서 가장 중요한 메커니즘 중 하나: 무한히 긴 대화를 유한한 컨텍스트 윈도우 안에서 어떻게 처리할 것인가
 
 ---
 
-## Architecture Diagram (Conceptual)
+## 7. Query Engine — 턴 단위 실행 엔진
+
+각 "턴"은 `query.ts`의 **query** 호출로 구동된다. 현재 메시지 리스트를 Anthropic API에 보내고 스트리밍 응답을 받는다.
+
+Query Engine이 처리하는 것들:
+
+1. **스트리밍 토큰 출력** — 실시간으로 터미널에 표시
+2. **`tool_use` 블록 디스패치** — 적절한 도구 핸들러로 라우팅
+3. **턴당 예산 적용** — 토큰 수와 도구 호출 횟수에 제한
+4. **도구 결과 수집** — 다음 모델 호출 전에 대화에 추가
+5. **Compaction 트리거** — 컨텍스트 윈도우가 가득 차면 자동 실행
+
+### 결과 크기 제한 (`maxResultSizeChars`)
+
+각 도구에 `maxResultSizeChars` 속성이 있다. 도구 결과가 이 한도를 초과하면:
+
+1. 전체 내용을 **임시 파일에 저장**
+2. 모델에는 **미리보기 + 파일 경로**만 전달
+3. 컨텍스트 윈도우 오버플로우 방지
+
+이를 통해 대용량 파일을 `Read`하더라도 컨텍스트가 폭발하지 않는다.
+
+---
+
+## 아키텍처 다이어그램
 
 ```
 User Input
@@ -225,23 +227,23 @@ User Input
 
 ---
 
-## Key Takeaways
+## 핵심 시사점
 
-### 1. Fully Local Execution
+### 1. 완전 로컬 실행 아키텍처
 
-No remote server. Everything runs in the terminal process. This is a security strength — but also means the agent depends on the user's machine resources.
+원격 서버 없이 터미널에서 모든 것이 돌아간다. 보안 관점에서 강점이며, 동시에 사용자 머신의 리소스에 의존한다는 제약도 있다.
 
-### 2. Compaction Is the Lifeline
+### 2. Compaction이 에이전트의 생명선
 
-How to manage a context window across long conversations is **the** core challenge of agent design. Claude Code's approach:
-- Always preserve the original transcript (audit trail)
-- Only summarize what's sent to the API
-- Also limit individual tool result sizes via `maxResultSizeChars`
+긴 대화에서 컨텍스트 윈도우를 어떻게 관리하느냐가 에이전트 설계의 핵심 과제다. Claude Code의 접근법:
+- 원본은 항상 보존 (감사 추적 가능)
+- API에 보내는 것만 요약
+- 도구 결과 크기도 `maxResultSizeChars`로 제한
 
-### 3. The allow/ask/deny Permission Pattern
+### 3. allow/ask/deny 권한 패턴
 
-This three-tier permission model is becoming the de facto standard for balancing **agent autonomy vs. safety**. Read-only is always allowed, writes depend on mode — simple but effective.
+이 3단계 권한 모델은 **AI 에이전트의 안전성과 자율성 사이의 균형**을 잡는 사실상의 표준이 되어가고 있다. Read-only는 항상 허용, 쓰기는 모드에 따라 — 단순하지만 효과적인 구분.
 
-### 4. Sub-agent Pattern as Orchestration Primitive
+### 4. Sub-agent 패턴의 가능성
 
-The Task tool for spawning sub-agents is the foundational pattern for **agent orchestration**. Isolated context + restricted tool set = safe parallel work. This is the starting point for multi-agent systems.
+Task tool을 통한 서브 에이전트 생성은 **에이전트 오케스트레이션**의 기본 패턴이다. 격리된 컨텍스트 + 제한된 도구 세트로 안전하게 병렬 작업 가능. 멀티 에이전트 시스템의 출발점.
