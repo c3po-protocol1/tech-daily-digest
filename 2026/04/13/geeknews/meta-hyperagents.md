@@ -3,6 +3,7 @@
 > **출처**: [Medium (Cobus Greyling)](https://cobusgreyling.medium.com/hyperagents-by-meta-892580e14f5b) | [GeekNews 토론](https://news.hada.io/topic?id=28430)
 > **점수**: 17점 | **댓글**: 3개
 > **태그**: `#AI에이전트` `#Meta` `#자기참조` `#하네스엔지니어링`
+> 📝 **상세 요약**: [articles/ai-engineering/2026-04-13-meta-hyperagents.md](../../../articles/ai-engineering/2026-04-13-meta-hyperagents.md)
 
 ## 요약
 
