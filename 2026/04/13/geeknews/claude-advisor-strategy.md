@@ -4,6 +4,7 @@
 > **점수**: 32점 | **댓글**: 1개
 > **태그**: `#AI` `#Claude` `#멀티모델` `#비용최적화` `#에이전트`
 
+> 📝 **상세 요약**: [articles/ai-engineering/2026-04-13-claude-advisor-strategy.md](../../../articles/ai-engineering/2026-04-13-claude-advisor-strategy.md)
 ## 요약
 
 Anthropic이 Claude Platform에 **Advisor 전략**을 공식 도입했다. 핵심은 Opus를 조언자(advisor)로, Sonnet/Haiku를 실행자(executor)로 조합하는 것.

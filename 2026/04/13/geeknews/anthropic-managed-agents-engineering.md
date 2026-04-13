@@ -3,6 +3,7 @@
 > **출처**: [Anthropic Engineering Blog](https://www.anthropic.com/engineering/managed-agents) | [GeekNews 토론](https://news.hada.io/topic?id=28427)
 > **점수**: 9점
 > **태그**: `#AI에이전트` `#Anthropic` `#아키텍처` `#인프라` `#하네스`
+> 📝 **상세 요약**: [articles/ai-engineering/2026-04-13-anthropic-managed-agents-architecture.md](../../../articles/ai-engineering/2026-04-13-anthropic-managed-agents-architecture.md)
 
 ## 요약
 
